@@ -1,5 +1,7 @@
 pandas==2.3.3
 streamlit==1.50.0
-streamlit-folium==0.24.0
-h3-py
 folium==0.20.0
+streamlit-folium==0.24.0
+geopandas==0.13.0
+shapely==2.1.1
+h3ronpy==0.6.0

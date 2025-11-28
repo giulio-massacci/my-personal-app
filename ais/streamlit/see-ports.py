@@ -2,14 +2,16 @@ import streamlit as st
 import pandas as pd
 import folium
 from streamlit_folium import st_folium
-import h3
-import branca.colormap
+import geopandas as gpd
+from shapely.geometry import Polygon
+import h3ronpy.pandas.vector as hrpv
 
 # ----------------------------------------------------
 # Caricamento dati
 # ----------------------------------------------------
 @st.cache_data
 def load_data():
+    # Usa URL pubblici o metti i CSV nella cartella del repo
     porti = pd.read_csv(
         "https://raw.githubusercontent.com/istat-methodology/istat-ais-lib/refs/heads/main/data/Porti_WORLD_NO_ITA_K3_RES8_NO_DUP.csv",
         sep=";"
@@ -20,32 +22,18 @@ def load_data():
     )
     return porti, porti_v2
 
-
 # ----------------------------------------------------
-# Funzione conversione H3 → GeoJSON
+# Funzione conversione H3 → GeoDataFrame
 # ----------------------------------------------------
-def h3_to_geoj(df, column):
-    geojson_out = {
-        "type": "FeatureCollection",
-        "features": []
-    }
-
-    for _, i in df.iterrows():
-        geojson_out["features"].append({
-            "type": "Feature",
-            "properties": {
-                "name": i[column[1]]
-            },
-            "geometry": {
-                "type": "Polygon",
-                "coordinates": [
-                    h3.h3_to_geo_boundary(i[column[0]], geo_json=True)
-                ]
-            }
-        })
-
-    return geojson_out
-
+def h3_to_gdf(df, h3_column, name_column):
+    # converte H3 → geometrie poligoni Shapely
+    geometries = hrpv.cells_to_polygons(df[h3_column].values)
+    
+    # filtra eventuali None (celle non valide)
+    valid_idx = [i for i, geom in enumerate(geometries) if geom is not None]
+    df_valid = df.iloc[valid_idx].copy()
+    gdf = gpd.GeoDataFrame(df_valid, geometry=[geometries[i] for i in valid_idx], crs="EPSG:4326")
+    return gdf
 
 # ----------------------------------------------------
 # Streamlit APP
@@ -85,33 +73,26 @@ dataset_choice = st.selectbox(
     "Seleziona il dataset",
     ["Dataset 1 (porti)", "Dataset 2 (porti_v2)"]
 )
-
-# Associa la scelta al dataframe corretto
-if dataset_choice == "Dataset 1 (porti)":
-    df = porti
-else:
-    df = porti_v2
+df = porti if dataset_choice == "Dataset 1 (porti)" else porti_v2
 
 # ----------------------------------------------------
-# SELECTBOX Country (dipendente dal dataset scelto)
+# SELECTBOX Country
 # ----------------------------------------------------
 country_list = sorted(df["Country"].dropna().unique())
 selected_country = st.selectbox("Seleziona il Paese", country_list)
-
-# Filtra sul Paese scelto
 df_country = df[df["Country"] == selected_country]
 
 # ----------------------------------------------------
-# SELECTBOX Porto (dipendente da Country + Dataset)
+# SELECTBOX Porto
 # ----------------------------------------------------
 port_list = sorted(df_country["Name"].dropna().unique())
 selected_port = st.selectbox("Seleziona il Porto", port_list)
-
-# Filtra un singolo porto
 df_port = df_country[df_country["Name"] == selected_port]
 
-# Converto in GeoJSON
-port_geojson_out = h3_to_geoj(df_port, ["H3_hex_8", "Name"])
+# ----------------------------------------------------
+# Converto H3 → GeoDataFrame
+# ----------------------------------------------------
+gdf_port = h3_to_gdf(df_port, "H3_int_index_8", "Name")
 
 # ----------------------------------------------------
 # Creazione mappa Folium
@@ -119,22 +100,18 @@ port_geojson_out = h3_to_geoj(df_port, ["H3_hex_8", "Name"])
 map_center = [42.233235, 12.975832]
 m = folium.Map(location=map_center, zoom_start=5)
 
-folium.GeoJson(
-    port_geojson_out,
-    name="Port",
-    tooltip=folium.features.GeoJsonTooltip(
-        fields=["name"],
-        aliases=["Porto:"],
-        style=("background-color: white; color: #333333; "
-               "font-family: arial; font-size: 12px; padding: 10px;")
-    ),
-    style_function=lambda x: {
-        "fillColor": "blue",
-        "color": "blue",
-        "weight": 0.7,
-        "fillOpacity": 0.4
-    }
-).add_to(m)
+for _, row in gdf_port.iterrows():
+    folium.GeoJson(
+        row.geometry.__geo_interface__,
+        name=row["Name"],
+        tooltip=folium.Tooltip(f"Porto: {row['Name']}"),
+        style_function=lambda x: {
+            "fillColor": "blue",
+            "color": "blue",
+            "weight": 0.7,
+            "fillOpacity": 0.4
+        }
+    ).add_to(m)
 
 folium.LayerControl().add_to(m)
 
