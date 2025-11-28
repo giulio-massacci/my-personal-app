@@ -1,0 +1,5 @@
+pandas==2.3.3
+streamlit==1.50.0
+streamlit-folium==0.24.0
+h3==3.7.6
+folium==0.20.0
