@@ -13,13 +13,11 @@ import h3ronpy.pandas.vector as hrpv
 def load_data():
     # Usa URL pubblici o metti i CSV nella cartella del repo
     porti = pd.read_csv(
-        #"https://raw.githubusercontent.com/istat-methodology/istat-ais-lib/refs/heads/main/data/Porti_WORLD_NO_ITA_K3_RES8_NO_DUP.csv",
-        "C:/Users/UTENTE/VSCodeProjects/my-personal-app/ais/porti.csv",
+        "https://raw.githubusercontent.com/istat-methodology/istat-ais-lib/refs/heads/main/data/Porti_WORLD_NO_ITA_K3_RES8_NO_DUP.csv",
         sep=";"
     )
     porti_v2 = pd.read_csv(
-        "C:/Users/UTENTE/VSCodeProjects/my-personal-app/ais/porti_v2.csv",
-        #"https://raw.githubusercontent.com/istat-methodology/istat-ais-lib/refs/heads/main/data/Porti_WORLD_NO_ITA_K3_RES8_NO_DUP_v2.csv",
+        "https://raw.githubusercontent.com/istat-methodology/istat-ais-lib/refs/heads/main/data/Porti_WORLD_NO_ITA_K3_RES8_NO_DUP_v2.csv",
         sep=";"
     )
     return porti, porti_v2
