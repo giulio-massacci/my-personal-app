@@ -13,11 +13,13 @@ import h3ronpy.pandas.vector as hrpv
 def load_data():
     # Usa URL pubblici o metti i CSV nella cartella del repo
     porti = pd.read_csv(
-        "https://raw.githubusercontent.com/istat-methodology/istat-ais-lib/refs/heads/main/data/Porti_WORLD_NO_ITA_K3_RES8_NO_DUP.csv",
+        #"https://raw.githubusercontent.com/istat-methodology/istat-ais-lib/refs/heads/main/data/Porti_WORLD_NO_ITA_K3_RES8_NO_DUP.csv",
+        "C:/Users/UTENTE/VSCodeProjects/my-personal-app/ais/porti.csv",
         sep=";"
     )
     porti_v2 = pd.read_csv(
-        "https://raw.githubusercontent.com/istat-methodology/istat-ais-lib/refs/heads/main/data/Porti_WORLD_NO_ITA_K3_RES8_NO_DUP_v2.csv",
+        "C:/Users/UTENTE/VSCodeProjects/my-personal-app/ais/porti_v2.csv",
+        #"https://raw.githubusercontent.com/istat-methodology/istat-ais-lib/refs/heads/main/data/Porti_WORLD_NO_ITA_K3_RES8_NO_DUP_v2.csv",
         sep=";"
     )
     return porti, porti_v2
@@ -26,10 +28,13 @@ def load_data():
 # Funzione conversione H3 → GeoDataFrame
 # ----------------------------------------------------
 def h3_to_gdf(df, h3_column, name_column):
-    # converte H3 → geometrie poligoni Shapely
-    geometries = hrpv.cells_to_polygons(df[h3_column].values)
+    # converte stringhe esadecimali in integer
+    h3_indexes = df[h3_column].apply(lambda x: int(x, 16)).values
     
-    # filtra eventuali None (celle non valide)
+    # converte H3 → geometrie poligoni Shapely
+    geometries = hrpv.cells_to_polygons(h3_indexes)
+    
+    # filtra eventuali None
     valid_idx = [i for i, geom in enumerate(geometries) if geom is not None]
     df_valid = df.iloc[valid_idx].copy()
     gdf = gpd.GeoDataFrame(df_valid, geometry=[geometries[i] for i in valid_idx], crs="EPSG:4326")
@@ -92,7 +97,7 @@ df_port = df_country[df_country["Name"] == selected_port]
 # ----------------------------------------------------
 # Converto H3 → GeoDataFrame
 # ----------------------------------------------------
-gdf_port = h3_to_gdf(df_port, "H3_int_index_8", "Name")
+gdf_port = h3_to_gdf(df_port, "H3_hex_8", "Name")
 
 # ----------------------------------------------------
 # Creazione mappa Folium
