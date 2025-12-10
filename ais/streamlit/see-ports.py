@@ -12,19 +12,19 @@ import h3ronpy.pandas.vector as hrpv
 @st.cache_data
 def load_data():
     # Usa URL pubblici o metti i CSV nella cartella del repo
-    porti = pd.read_csv(
-        "https://raw.githubusercontent.com/istat-methodology/istat-ais-lib/refs/heads/main/data/Porti_WORLD_NO_ITA_K3_RES8_NO_DUP.csv",
+    ita_ports = pd.read_csv(
+        "https://raw.githubusercontent.com/istat-methodology/istat-ais-lib/refs/heads/main/data/Porti_ITA_fitted_RES_8_V3.csv",
         sep=";"
     )
-    porti_v2 = pd.read_csv(
-        "https://raw.githubusercontent.com/istat-methodology/istat-ais-lib/refs/heads/main/data/Porti_WORLD_NO_ITA_K3_RES8_NO_DUP_v2.csv",
-        sep=";"
-    )
-    porti_v3 = pd.read_csv(
+    no_ita_ports = pd.read_csv(
         "https://raw.githubusercontent.com/istat-methodology/istat-ais-lib/refs/heads/main/data/porti_WORLD_NO_ITA_K3_RES8_NO_DUP_v3.csv",
         sep=";"
     )
-    return porti, porti_v2, porti_v3
+    offshore_platforms = pd.read_csv(
+        "https://raw.githubusercontent.com/istat-methodology/istat-ais-lib/refs/heads/main/data/OFFSHORE_PLATFORM.csv",
+        sep=";"
+    )
+    return ita_ports, no_ita_ports, offshore_platforms
 
 # ----------------------------------------------------
 # Funzione conversione H3 → GeoDataFrame
@@ -49,7 +49,7 @@ def h3_to_gdf(df, h3_column, name_column):
 st.title("🌍 AIS - Visualizzazione porti")
 
 # Carico i dati
-porti, porti_v2, porti_v3= load_data()
+ita_ports, no_ita_ports, offshore_platforms= load_data()
 
 st.markdown(
     """
@@ -78,30 +78,33 @@ st.markdown(
 # ----------------------------------------------------
 dataset_choice = st.selectbox(
     "Seleziona il dataset",
-    ["Dataset 1 (porti)", "Dataset 2 (porti_v2)","Dataset 3 (porti_v3)"]
+    ["Italian ports (v3)", "No italian ports (v3)", "Offshore platforms (v1)"]
 )
 
 df = []
-if dataset_choice == "Dataset 1 (porti)":
-    df = porti
-elif dataset_choice == "Dataset 2 (porti_v2)":
-    df = porti_v2
+if dataset_choice == "Italian ports (v3)":
+    df = ita_ports
+elif dataset_choice == "No italian ports (v3)":
+    df = no_ita_ports
 else:
-    df = porti_v3
+    df = offshore_platforms
 
-# ----------------------------------------------------
-# SELECTBOX Country
-# ----------------------------------------------------
-country_list = sorted(df["Country"].dropna().unique())
-selected_country = st.selectbox("Seleziona il Paese", country_list)
-df_country = df[df["Country"] == selected_country]
+if dataset_choice != "No italian ports (v3)":
+    df_port = df
+else:
+    # ----------------------------------------------------
+    # SELECTBOX Country
+    # ----------------------------------------------------
+    country_list = sorted(df["Country"].dropna().unique())
+    selected_country = st.selectbox("Seleziona il Paese", country_list)
+    df_country = df[df["Country"] == selected_country]
 
-# ----------------------------------------------------
-# SELECTBOX Porto
-# ----------------------------------------------------
-port_list = sorted(df_country["Name"].dropna().unique())
-selected_port = st.selectbox("Seleziona il Porto", port_list)
-df_port = df_country[df_country["Name"] == selected_port]
+    # ----------------------------------------------------
+    # SELECTBOX Porto
+    # ----------------------------------------------------
+    port_list = sorted(df_country["Name"].dropna().unique())
+    selected_port = st.selectbox("Seleziona il Porto", port_list)
+    df_port = df_country[df_country["Name"] == selected_port]
 
 # ----------------------------------------------------
 # Converto H3 → GeoDataFrame
