@@ -20,7 +20,11 @@ def load_data():
         "https://raw.githubusercontent.com/istat-methodology/istat-ais-lib/refs/heads/main/data/Porti_WORLD_NO_ITA_K3_RES8_NO_DUP_v2.csv",
         sep=";"
     )
-    return porti, porti_v2
+    porti_v3 = pd.read_csv(
+        "https://raw.githubusercontent.com/istat-methodology/istat-ais-lib/refs/heads/main/data/porti_WORLD_NO_ITA_K3_RES8_NO_DUP_v3.csv",
+        sep=";"
+    )
+    return porti, porti_v2, porti_v3
 
 # ----------------------------------------------------
 # Funzione conversione H3 → GeoDataFrame
@@ -45,7 +49,7 @@ def h3_to_gdf(df, h3_column, name_column):
 st.title("🌍 AIS - Visualizzazione porti")
 
 # Carico i dati
-porti, porti_v2 = load_data()
+porti, porti_v2, porti_v3= load_data()
 
 st.markdown(
     """
@@ -74,9 +78,16 @@ st.markdown(
 # ----------------------------------------------------
 dataset_choice = st.selectbox(
     "Seleziona il dataset",
-    ["Dataset 1 (porti)", "Dataset 2 (porti_v2)"]
+    ["Dataset 1 (porti)", "Dataset 2 (porti_v2)","Dataset 3 (porti_v3)"]
 )
-df = porti if dataset_choice == "Dataset 1 (porti)" else porti_v2
+
+df = None
+if dataset_choice == "Dataset 1 (porti)":
+    df = porti
+elif dataset_choice == "Dataset 2 (porti_v2)":
+    df = porti_v2
+else:
+    df = porti_v3
 
 # ----------------------------------------------------
 # SELECTBOX Country
