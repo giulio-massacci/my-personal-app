@@ -11,7 +11,6 @@ import h3ronpy.pandas.vector as hrpv
 # ----------------------------------------------------
 @st.cache_data
 def load_data():
-    # Usa URL pubblici o metti i CSV nella cartella del repo
     ita_ports = pd.read_csv(
         "https://raw.githubusercontent.com/istat-methodology/istat-ais-lib/refs/heads/main/data/Porti_ITA_fitted_RES_8_V3.csv",
         sep=";"
@@ -30,109 +29,139 @@ def load_data():
 # Funzione conversione H3 → GeoDataFrame
 # ----------------------------------------------------
 def h3_to_gdf(df, h3_column, name_column):
-    # converte stringhe esadecimali in integer
     h3_indexes = df[h3_column].apply(lambda x: int(x, 16)).values
-    
-    # converte H3 → geometrie poligoni Shapely
     geometries = hrpv.cells_to_polygons(h3_indexes)
-    
-    # filtra eventuali None
     valid_idx = [i for i, geom in enumerate(geometries) if geom is not None]
     df_valid = df.iloc[valid_idx].copy()
     gdf = gpd.GeoDataFrame(df_valid, geometry=[geometries[i] for i in valid_idx], crs="EPSG:4326")
     return gdf
 
+ita_ports, no_ita_ports, offshore_platforms = load_data()
 # ----------------------------------------------------
-# Streamlit APP
+# Streamlit APP con Tabs
 # ----------------------------------------------------
+st.title("🌍 AIS - Visualizzazione porti e H3")
 
-st.title("🌍 AIS - Visualizzazione porti")
+tab1, tab2 = st.tabs(["Porti e piattaforme", "Poligoni H3 da coordinate"])
 
-# Carico i dati
-ita_ports, no_ita_ports, offshore_platforms= load_data()
+# ================= TAB 1 =================
+with tab1:
+    st.markdown("### Visualizzazione porti e piattaforme")
+    
+    dataset_choice = st.selectbox(
+        "Seleziona il dataset",
+        ["Italian ports (v3)", "No italian ports (v3)", "Offshore platforms (v1)"]
+    )
+    
+    df = []
+    if dataset_choice == "Italian ports (v3)":
+        df = ita_ports
+    elif dataset_choice == "No italian ports (v3)":
+        df = no_ita_ports
+    else:
+        df = offshore_platforms
+    
+    if dataset_choice != "No italian ports (v3)":
+        df_port = df
+    else:
+        country_list = sorted(df["Country"].dropna().unique())
+        selected_country = st.selectbox("Seleziona il Paese", country_list)
+        df_country = df[df["Country"] == selected_country]
 
-st.markdown(
-    """
-    <a href="https://unece.org/trade/cefact/unlocode-code-list-country-and-territory" target="_blank">
-        <button style="
-            background-color:#0068c9;
-            border:none;
-            color:white;
-            padding:8px 16px;
-            text-align:center;
-            text-decoration:none;
-            display:inline-block;
-            font-size:16px;
-            border-radius:6px;
-            cursor:pointer;
-        ">
-            🌐 Apri lista UN/LOCODE (UNECE)
-        </button>
-    </a>
-    """,
-    unsafe_allow_html=True
-)
+        port_list = sorted(df_country["Name"].dropna().unique())
+        selected_port = st.selectbox("Seleziona il Porto", port_list)
+        df_port = df_country[df_country["Name"] == selected_port]
+    
+    gdf_port = h3_to_gdf(df_port, "H3_hex_8", "Name")
+    
+    map_center = [42.233235, 12.975832]
+    m1 = folium.Map(location=map_center, zoom_start=5)
+    
+    for _, row in gdf_port.iterrows():
+        folium.GeoJson(
+            row.geometry.__geo_interface__,
+            name=row["Name"],
+            tooltip=folium.Tooltip(f"Porto: {row['Name']}"),
+            style_function=lambda x: {
+                "fillColor": "blue",
+                "color": "blue",
+                "weight": 0.7,
+                "fillOpacity": 0.4
+            }
+        ).add_to(m1)
+    
+    folium.LayerControl().add_to(m1)
+    st_folium(m1, width=800, height=600)
 
-# ----------------------------------------------------
-# SELECTBOX: Scegli il dataset
-# ----------------------------------------------------
-dataset_choice = st.selectbox(
-    "Seleziona il dataset",
-    ["Italian ports (v3)", "No italian ports (v3)", "Offshore platforms (v1)"]
-)
+# ================= TAB 2 =================
+# ================= TAB 2 =================
+with tab2:
+    st.markdown("### Generazione poligoni H3 da coordinate e dataset")
+    
+    # Selezione dataset
+    dataset_choice_tab2 = st.selectbox(
+        "Seleziona il dataset",
+        ["Italian ports (v3)", "No italian ports (v3)", "Offshore platforms (v1)"]
+    )
 
-df = []
-if dataset_choice == "Italian ports (v3)":
-    df = ita_ports
-elif dataset_choice == "No italian ports (v3)":
-    df = no_ita_ports
-else:
-    df = offshore_platforms
+    if dataset_choice_tab2 == "Italian ports (v3)":
+        df_tab2 = ita_ports
+    elif dataset_choice_tab2 == "No italian ports (v3)":
+        df_tab2 = no_ita_ports
+    else:
+        df_tab2 = offshore_platforms
 
-if dataset_choice != "No italian ports (v3)":
-    df_port = df
-else:
-    # ----------------------------------------------------
-    # SELECTBOX Country
-    # ----------------------------------------------------
-    country_list = sorted(df["Country"].dropna().unique())
-    selected_country = st.selectbox("Seleziona il Paese", country_list)
-    df_country = df[df["Country"] == selected_country]
+    # Input coordinate e H3
+    lat_input = st.number_input("Latitudine", value=42.0, format="%.6f")
+    lon_input = st.number_input("Longitudine", value=12.0, format="%.6f")
+    resolution_input = st.slider("Risoluzione H3", min_value=0, max_value=10, value=8)
+    k_ring_input = st.slider("Raggio del ring (k)", min_value=1, max_value=5, value=1)
 
-    # ----------------------------------------------------
-    # SELECTBOX Porto
-    # ----------------------------------------------------
-    port_list = sorted(df_country["Name"].dropna().unique())
-    selected_port = st.selectbox("Seleziona il Porto", port_list)
-    df_port = df_country[df_country["Name"] == selected_port]
+    if st.button("Genera poligoni H3"):
+        # Punto centrale
+        gdf_point = gpd.GeoDataFrame(
+            geometry=[gpd.points_from_xy([lon_input], [lat_input])[0]],
+            crs="EPSG:4326"
+        )
+        df_h3 = hrpv.cells_from_geo(gdf_point, h3_resolution=resolution_input, geometry_column="geometry")
+        h3_central = df_h3["h3_cell"].iloc[0]
+        h3_ring = hrpv.grid_ring([h3_central], k_ring_input)
+        geometries = hrpv.cells_to_polygons(h3_ring)
+        gdf_ring = gpd.GeoDataFrame({"h3_index": h3_ring}, geometry=geometries, crs="EPSG:4326")
 
-# ----------------------------------------------------
-# Converto H3 → GeoDataFrame
-# ----------------------------------------------------
-gdf_port = h3_to_gdf(df_port, "H3_hex_8", "Name")
+        # Converto dataset scelto in H3
+        gdf_data = h3_to_gdf(df_tab2, "H3_hex_8", "Name")
 
-# ----------------------------------------------------
-# Creazione mappa Folium
-# ----------------------------------------------------
-map_center = [42.233235, 12.975832]
-m = folium.Map(location=map_center, zoom_start=5)
+        # Creo mappa
+        m2 = folium.Map(location=[lat_input, lon_input], zoom_start=6)
 
-for _, row in gdf_port.iterrows():
-    folium.GeoJson(
-        row.geometry.__geo_interface__,
-        name=row["Name"],
-        tooltip=folium.Tooltip(f"Porto: {row['Name']}"),
-        style_function=lambda x: {
-            "fillColor": "blue",
-            "color": "blue",
-            "weight": 0.7,
-            "fillOpacity": 0.4
-        }
-    ).add_to(m)
+        # Poligoni dataset (blu)
+        for _, row in gdf_data.iterrows():
+            folium.GeoJson(
+                row.geometry.__geo_interface__,
+                name=row.get("Name", row.get("h3_index", "dataset")),
+                tooltip=folium.Tooltip(f"{row.get('Name', row.get('h3_index', 'dataset'))}"),
+                style_function=lambda x: {
+                    "fillColor": "blue",
+                    "color": "blue",
+                    "weight": 0.7,
+                    "fillOpacity": 0.4
+                }
+            ).add_to(m2)
 
-folium.LayerControl().add_to(m)
+        # Poligoni H3 attorno alla coordinata (rosso)
+        for _, row in gdf_ring.iterrows():
+            folium.GeoJson(
+                row.geometry.__geo_interface__,
+                name=row["h3_index"],
+                tooltip=folium.Tooltip(f"H3: {row['h3_index']}"),
+                style_function=lambda x: {
+                    "fillColor": "red",
+                    "color": "red",
+                    "weight": 0.7,
+                    "fillOpacity": 0.4
+                }
+            ).add_to(m2)
 
-# ----------------------------------------------------
-# Visualizzazione mappa in Streamlit
-# ----------------------------------------------------
-st_folium(m, width=800, height=600)
+        folium.LayerControl().add_to(m2)
+        st_folium(m2, width=800, height=600)
