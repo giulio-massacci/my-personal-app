@@ -81,7 +81,7 @@ dataset_choice = st.selectbox(
     ["Dataset 1 (porti)", "Dataset 2 (porti_v2)","Dataset 3 (porti_v3)"]
 )
 
-df = None
+df = []
 if dataset_choice == "Dataset 1 (porti)":
     df = porti
 elif dataset_choice == "Dataset 2 (porti_v2)":
