@@ -37,16 +37,25 @@ def h3_to_gdf(df, h3_column, name_column):
     gdf = gpd.GeoDataFrame(df_valid, geometry=[geometries[i] for i in valid_idx], crs="EPSG:4326")
     return gdf
 
-ita_ports, no_ita_ports, offshore_platforms = load_data()
 # ----------------------------------------------------
-# Streamlit APP con Tabs
+# Inizializza session_state per bottone H3
+# ----------------------------------------------------
+if "generate_h3" not in st.session_state:
+    st.session_state.generate_h3 = False
+
+# ----------------------------------------------------
+# Caricamento dati
+# ----------------------------------------------------
+ita_ports, no_ita_ports, offshore_platforms = load_data()
+
+# ----------------------------------------------------
+# Streamlit APP con radio per selezione tab
 # ----------------------------------------------------
 st.title("🌍 AIS - Visualizzazione porti e H3")
-
-tab1, tab2 = st.tabs(["Porti e piattaforme", "Poligoni H3 da coordinate"])
+selected_tab = st.radio("Seleziona Tab", ["Porti e piattaforme", "Poligoni H3 da coordinate"])
 
 # ================= TAB 1 =================
-with tab1:
+if selected_tab == "Porti e piattaforme":
     st.markdown("### Visualizzazione porti e piattaforme")
     
     dataset_choice = st.selectbox(
@@ -96,11 +105,9 @@ with tab1:
     st_folium(m1, width=800, height=600)
 
 # ================= TAB 2 =================
-# ================= TAB 2 =================
-with tab2:
+elif selected_tab == "Poligoni H3 da coordinate":
     st.markdown("### Generazione poligoni H3 da coordinate e dataset")
     
-    # Selezione dataset
     dataset_choice_tab2 = st.selectbox(
         "Seleziona il dataset",
         ["Italian ports (v3)", "No italian ports (v3)", "Offshore platforms (v1)"],
@@ -120,32 +127,18 @@ with tab2:
     resolution_input = st.slider("Risoluzione H3", min_value=0, max_value=10, value=8)
     k_ring_input = st.slider("Raggio del ring (k)", min_value=1, max_value=5, value=1)
 
-    # Inizializzo lo stato del bottone
-    if "generate_h3" not in st.session_state:
-        st.session_state.generate_h3 = False
-
     if st.button("Genera poligoni H3"):
-        st.session_state.generate_h3 = True
+        st.session_state.generate_h3 = True  # ricorda che il bottone è stato premuto
 
-    # Se il bottone è stato premuto, genero la mappa
+    # Genera la mappa solo se il bottone è stato premuto
     if st.session_state.generate_h3:
-        # Punto centrale come GeoDataFrame
         gdf_point = gpd.GeoDataFrame(
             {"lat": [lat_input], "lon": [lon_input]},
             geometry=gpd.points_from_xy([lon_input], [lat_input]),
             crs="EPSG:4326"
         )
-
-        # Converto il punto in cella H3
-        df_h3 = hrpv.geodataframe_to_cells(
-            gdf_point,
-            resolution=resolution_input,
-        )
-
-        # Trova le celle adiacenti
+        df_h3 = hrpv.geodataframe_to_cells(gdf_point, resolution=resolution_input)
         h3_ring = grid_disk([df_h3["cell"].iloc[0]], k=k_ring_input, flatten=True)
-
-        # Converto le celle H3 in poligoni
         geometries = hrpv.cells_to_polygons(h3_ring)
         gdf_ring = gpd.GeoDataFrame(geometry=geometries, crs="EPSG:4326")
 
@@ -161,6 +154,7 @@ with tab2:
             selected_port = st.selectbox("Seleziona il Porto", port_list, key="tab2_port")
             df_port = df_country[df_country["Name"] == selected_port]
         gdf_data = h3_to_gdf(df_port, "H3_hex_8", "Name")
+
         # Creo mappa
         m2 = folium.Map(location=[lat_input, lon_input], zoom_start=6)
 
