@@ -50,7 +50,8 @@ with tab1:
     
     dataset_choice = st.selectbox(
         "Seleziona il dataset",
-        ["Italian ports (v3)", "No italian ports (v3)", "Offshore platforms (v1)"]
+        ["Italian ports (v3)", "No italian ports (v3)", "Offshore platforms (v1)"],
+        key="tab1_dataset"
     )
     
     df = []
@@ -101,7 +102,8 @@ with tab2:
     # Selezione dataset
     dataset_choice_tab2 = st.selectbox(
         "Seleziona il dataset",
-        ["Italian ports (v3)", "No italian ports (v3)", "Offshore platforms (v1)"]
+        ["Italian ports (v3)", "No italian ports (v3)", "Offshore platforms (v1)"],
+        key="tab2_dataset"
     )
 
     if dataset_choice_tab2 == "Italian ports (v3)":
