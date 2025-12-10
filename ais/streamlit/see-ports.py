@@ -5,6 +5,7 @@ from streamlit_folium import st_folium
 import geopandas as gpd
 from shapely.geometry import Polygon
 import h3ronpy.pandas.vector as hrpv
+from h3ronpy import grid_disk
 
 # ----------------------------------------------------
 # Caricamento dati
@@ -66,11 +67,11 @@ with tab1:
         df_port = df
     else:
         country_list = sorted(df["Country"].dropna().unique())
-        selected_country = st.selectbox("Seleziona il Paese", country_list)
+        selected_country = st.selectbox("Seleziona il Paese", country_list, key="tab1_country")
         df_country = df[df["Country"] == selected_country]
 
         port_list = sorted(df_country["Name"].dropna().unique())
-        selected_port = st.selectbox("Seleziona il Porto", port_list)
+        selected_port = st.selectbox("Seleziona il Porto", port_list, key="tab1_port")
         df_port = df_country[df_country["Name"] == selected_port]
     
     gdf_port = h3_to_gdf(df_port, "H3_hex_8", "Name")
@@ -105,7 +106,7 @@ with tab2:
         ["Italian ports (v3)", "No italian ports (v3)", "Offshore platforms (v1)"],
         key="tab2_dataset"
     )
-
+    df_tab2 = []
     if dataset_choice_tab2 == "Italian ports (v3)":
         df_tab2 = ita_ports
     elif dataset_choice_tab2 == "No italian ports (v3)":
@@ -119,21 +120,47 @@ with tab2:
     resolution_input = st.slider("Risoluzione H3", min_value=0, max_value=10, value=8)
     k_ring_input = st.slider("Raggio del ring (k)", min_value=1, max_value=5, value=1)
 
+    # Inizializzo lo stato del bottone
+    if "generate_h3" not in st.session_state:
+        st.session_state.generate_h3 = False
+
     if st.button("Genera poligoni H3"):
-        # Punto centrale
+        st.session_state.generate_h3 = True
+
+    # Se il bottone è stato premuto, genero la mappa
+    if st.session_state.generate_h3:
+        # Punto centrale come GeoDataFrame
         gdf_point = gpd.GeoDataFrame(
-            geometry=[gpd.points_from_xy([lon_input], [lat_input])[0]],
+            {"lat": [lat_input], "lon": [lon_input]},
+            geometry=gpd.points_from_xy([lon_input], [lat_input]),
             crs="EPSG:4326"
         )
-        df_h3 = hrpv.cells_from_geo(gdf_point, h3_resolution=resolution_input, geometry_column="geometry")
-        h3_central = df_h3["h3_cell"].iloc[0]
-        h3_ring = hrpv.grid_ring([h3_central], k_ring_input)
+
+        # Converto il punto in cella H3
+        df_h3 = hrpv.geodataframe_to_cells(
+            gdf_point,
+            resolution=resolution_input,
+        )
+
+        # Trova le celle adiacenti
+        h3_ring = grid_disk([df_h3["cell"].iloc[0]], k=k_ring_input, flatten=True)
+
+        # Converto le celle H3 in poligoni
         geometries = hrpv.cells_to_polygons(h3_ring)
-        gdf_ring = gpd.GeoDataFrame({"h3_index": h3_ring}, geometry=geometries, crs="EPSG:4326")
+        gdf_ring = gpd.GeoDataFrame(geometry=geometries, crs="EPSG:4326")
 
         # Converto dataset scelto in H3
-        gdf_data = h3_to_gdf(df_tab2, "H3_hex_8", "Name")
+        if dataset_choice_tab2 != "No italian ports (v3)":
+            df_port = df_tab2
+        else:
+            country_list = sorted(df_tab2["Country"].dropna().unique())
+            selected_country = st.selectbox("Seleziona il Paese", country_list, key="tab2_country")
+            df_country = df_tab2[df_tab2["Country"] == selected_country]
 
+            port_list = sorted(df_country["Name"].dropna().unique())
+            selected_port = st.selectbox("Seleziona il Porto", port_list, key="tab2_port")
+            df_port = df_country[df_country["Name"] == selected_port]
+        gdf_data = h3_to_gdf(df_port, "H3_hex_8", "Name")
         # Creo mappa
         m2 = folium.Map(location=[lat_input, lon_input], zoom_start=6)
 
@@ -141,8 +168,8 @@ with tab2:
         for _, row in gdf_data.iterrows():
             folium.GeoJson(
                 row.geometry.__geo_interface__,
-                name=row.get("Name", row.get("h3_index", "dataset")),
-                tooltip=folium.Tooltip(f"{row.get('Name', row.get('h3_index', 'dataset'))}"),
+                name=row["Name"],
+                tooltip=folium.Tooltip(f"{row['Name']}"),
                 style_function=lambda x: {
                     "fillColor": "blue",
                     "color": "blue",
@@ -151,12 +178,10 @@ with tab2:
                 }
             ).add_to(m2)
 
-        # Poligoni H3 attorno alla coordinata (rosso)
+        # Poligoni H3 (rosso)
         for _, row in gdf_ring.iterrows():
             folium.GeoJson(
                 row.geometry.__geo_interface__,
-                name=row["h3_index"],
-                tooltip=folium.Tooltip(f"H3: {row['h3_index']}"),
                 style_function=lambda x: {
                     "fillColor": "red",
                     "color": "red",
