@@ -125,7 +125,7 @@ elif selected_tab == "Poligoni H3 da coordinate":
     lat_input = st.number_input("Latitudine", value=42.0, format="%.6f")
     lon_input = st.number_input("Longitudine", value=12.0, format="%.6f")
     resolution_input = st.slider("Risoluzione H3", min_value=0, max_value=10, value=8)
-    k_ring_input = st.slider("Raggio del ring (k)", min_value=1, max_value=5, value=1)
+    k_ring_input = st.slider("Raggio del ring (k)", min_value=0, max_value=5, value=1)
 
     if st.button("Genera poligoni H3"):
         st.session_state.generate_h3 = True  # ricorda che il bottone è stato premuto
