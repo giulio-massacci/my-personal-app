@@ -5,6 +5,7 @@ from streamlit_folium import st_folium
 import geopandas as gpd
 import h3ronpy.pandas.vector as hrpv
 from h3ronpy import grid_disk
+import numpy as np
 
 # =====================================================
 # CONFIG APP
@@ -45,7 +46,10 @@ def load_data():
 # =====================================================
 def h3_to_gdf(df, h3_column):
 
-    h3_indexes = df[h3_column].apply(lambda x: int(x, 16)).values
+    h3_indexes = df[h3_column].astype(str).apply(
+        lambda x: np.uint64(int(x, 16))
+    ).to_numpy()
+
     geometries = hrpv.cells_to_polygons(h3_indexes)
 
     valid_idx = [i for i, g in enumerate(geometries) if g is not None]
@@ -59,7 +63,6 @@ def h3_to_gdf(df, h3_column):
     )
 
     return gdf
-
 
 # =====================================================
 # PRECALCOLO GEOMETRIE (CHIAVE DELLA PERFORMANCE)
