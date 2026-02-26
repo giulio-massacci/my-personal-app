@@ -185,4 +185,9 @@ elif selected_tab == "Poligoni H3 da coordinate":
             ).add_to(m2)
 
         folium.LayerControl().add_to(m2)
-        st_folium(m2, width=800, height=600)
+        map_data = st_folium(m2, width=800, height=600)
+        if map_data and map_data["last_clicked"]:
+            lat_click = map_data["last_clicked"]["lat"]
+            lon_click = map_data["last_clicked"]["lng"]
+
+            st.success(f"Coordinate: {lat_click:.6f}, {lon_click:.6f}")
