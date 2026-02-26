@@ -49,9 +49,15 @@ def load_data():
 # =====================================================
 def h3_to_gdf(df, h3_column):
 
-    geometries = hrpv.cells_to_polygons(
-        df[h3_column].astype(str)
+    # HEX string → uint64 corretto per h3ronpy
+    h3_uint64 = (
+        df[h3_column]
+        .astype(str)
+        .apply(lambda x: np.uint64(int(x, 16)))
+        .to_numpy()
     )
+
+    geometries = hrpv.cells_to_polygons(h3_uint64)
 
     gdf = gpd.GeoDataFrame(
         df.copy(),
