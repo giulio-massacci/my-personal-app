@@ -21,17 +21,20 @@ def load_data():
 
     ita_ports = pd.read_csv(
         "https://raw.githubusercontent.com/istat-methodology/istat-ais-lib/refs/heads/main/data/Porti_ITA_fitted_RES_8_V3.csv",
-        sep=";"
+        sep=";",
+        dtype={"H3_hex_8": str}
     )
 
     no_ita_ports = pd.read_csv(
         "https://raw.githubusercontent.com/istat-methodology/istat-ais-lib/refs/heads/main/data/porti_WORLD_NO_ITA_K3_RES8_NO_DUP_v3.csv",
-        sep=";"
+        sep=";",
+        dtype={"H3_hex_8": str}
     )
 
     offshore_platforms = pd.read_csv(
         "https://raw.githubusercontent.com/istat-methodology/istat-ais-lib/refs/heads/main/data/OFFSHORE_PLATFORM.csv",
-        sep=";"
+        sep=";",
+        dtype={"H3_hex_8": str}
     )
 
     return {
@@ -46,19 +49,13 @@ def load_data():
 # =====================================================
 def h3_to_gdf(df, h3_column):
 
-    h3_indexes = df[h3_column].astype(str).apply(
-        lambda x: np.uint64(int(x, 16))
-    ).to_numpy()
-
-    geometries = hrpv.cells_to_polygons(h3_indexes)
-
-    valid_idx = [i for i, g in enumerate(geometries) if g is not None]
-
-    df_valid = df.iloc[valid_idx].copy()
+    geometries = hrpv.cells_to_polygons(
+        df[h3_column].astype(str)
+    )
 
     gdf = gpd.GeoDataFrame(
-        df_valid,
-        geometry=[geometries[i] for i in valid_idx],
+        df.copy(),
+        geometry=geometries,
         crs="EPSG:4326"
     )
 
