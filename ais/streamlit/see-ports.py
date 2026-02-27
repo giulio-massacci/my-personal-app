@@ -40,7 +40,7 @@ def load_data():
     }
 
 # =====================================================
-# CONVERSIONE H3 → GEOMETRIE (COSTOSA)
+# CONVERSIONE H3 → GEOMETRIE
 # =====================================================
 def h3_to_gdf(df, h3_column):
     h3_indexes = df[h3_column].apply(lambda x: int(x, 16)).values
@@ -55,7 +55,7 @@ def h3_to_gdf(df, h3_column):
     return gdf
 
 # =====================================================
-# PRECALCOLO GEOMETRIE (CHIAVE DELLA PERFORMANCE)
+# PRECALCOLO GEOMETRIE
 # =====================================================
 @st.cache_data(show_spinner="Costruzione geometrie H3...")
 def build_all_gdfs(datasets):
@@ -104,7 +104,7 @@ def add_gdf_to_map(m, gdf, color):
     return m
 
 # =====================================================
-# LOAD + PRECALCOLO (UNA VOLTA SOLA)
+# LOAD + PRECALCOLO
 # =====================================================
 DATASETS = load_data()
 ALL_GDFS = build_all_gdfs(DATASETS)
@@ -136,7 +136,6 @@ with tab1:
         list(ALL_GDFS.keys()),
         key="tab1_dataset"
     )
-
     gdf = ALL_GDFS[dataset_choice]
 
     if dataset_choice == "No italian ports (v3)":
@@ -152,36 +151,42 @@ with tab1:
         )
         gdf = gdf[gdf["Name"] == port]
 
+    # --- Mappa ---
     m1 = create_map()
     add_gdf_to_map(m1, gdf, "blue")
 
-    # Aggiungi poligoni cliccati precedentemente
+    # Aggiungi tutti i poligoni salvati
     for gdf_saved in st.session_state.tab1_click_polygons:
         add_gdf_to_map(m1, gdf_saved, "red")
 
     folium.LayerControl().add_to(m1)
-    map_data = st_folium(m1, width=900, height=600, key="tab1_map", returned_objects=["last_clicked"])
+    map_data = st_folium(
+        m1,
+        width=900,
+        height=600,
+        key="tab1_map",
+        returned_objects=["last_clicked"]
+    )
 
-    # Aggiungi nuovo poligono se cliccato
+    # --- Gestione click ---
     if map_data and map_data.get("last_clicked"):
         lat_click = map_data["last_clicked"]["lat"]
         lon_click = map_data["last_clicked"]["lng"]
+
+        # Crea subito il poligono e aggiungi a session_state
         int_cells = coordinates_to_cells(latarray=[lat_click], lngarray=[lon_click], resarray=8)
         h3_int = int(int_cells[0].as_py())
         h3_hex = format(h3_int, "x")
-
-        geometries = hrpv.cells_to_polygons(int_cells)
+        geometrie = hrpv.cells_to_polygons(int_cells)
         gdf_hex = gpd.GeoDataFrame(
             {
                 "Name": ["New Hexagon"],
                 "H3_hex_8": [h3_hex],
                 "H3_int_index_8": [h3_int]
             },
-            geometry=geometries,
+            geometry=geometrie,
             crs="EPSG:4326"
         )
-
-        # Salva in session_state
         st.session_state.tab1_click_polygons.append(gdf_hex)
 
         st.success(f"📍 Coordinate cliccate: Lat: {lat_click}, Lon: {lon_click}, H3 Hex: {h3_hex}, H3 Int: {h3_int}")
@@ -197,10 +202,10 @@ with tab2:
         list(ALL_GDFS.keys()),
         key="tab2_dataset"
     )
-
     gdf_data = ALL_GDFS[dataset_choice]
 
     if dataset_choice == "No italian ports (v3)":
+        gdf_data["label"] = gdf_data["UNLocode"].astype(str) + " - " + gdf_data["Name"].astype(str)
         country = st.selectbox(
             "Seleziona Paese",
             sorted(gdf_data["Country"].dropna().unique())
@@ -209,9 +214,10 @@ with tab2:
 
         port = st.selectbox(
             "Seleziona Porto",
-            sorted(gdf_data["Name"].dropna().unique())
+            sorted(gdf_data["label"].dropna().unique())
         )
-        gdf_data = gdf_data[gdf_data["Name"] == port]
+        selected_name = port.split(" - ")[0]
+        gdf_data = gdf_data[gdf_data["Name"] == selected_name]
 
     # ---------------- INPUT ----------------
     col1, col2, col3, col4 = st.columns(4)
@@ -236,13 +242,18 @@ with tab2:
             crs="EPSG:4326"
         )
 
-        # Salva in session_state
         st.session_state.tab2_polygons.append(gdf_ring)
 
-    # mappa
+    # --- Mappa ---
     m2 = create_map([lat, lon], 6)
     add_gdf_to_map(m2, gdf_data, "blue")
     for gdf_saved in st.session_state.tab2_polygons:
         add_gdf_to_map(m2, gdf_saved, "red")
     folium.LayerControl().add_to(m2)
-    st_folium(m2, width=900, height=600, key="tab2_map", returned_objects=["last_clicked"])
+    st_folium(
+        m2,
+        width=900,
+        height=600,
+        key="tab2_map",
+        returned_objects=["last_clicked"]
+    )
