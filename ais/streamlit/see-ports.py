@@ -139,6 +139,7 @@ with tab1:
     gdf = ALL_GDFS[dataset_choice]
 
     if dataset_choice == "No italian ports (v3)":
+        gdf["port"] = gdf["UNLocode"].astype(str) + " - " + gdf["Name"].astype(str)
         country = st.selectbox(
             "Seleziona Paese",
             sorted(gdf["Country"].dropna().unique())
@@ -147,9 +148,10 @@ with tab1:
 
         port = st.selectbox(
             "Seleziona Porto",
-            sorted(gdf["Name"].dropna().unique())
+            sorted(gdf["port"].dropna().unique())
         )
-        gdf = gdf[gdf["Name"] == port]
+        selected_name = port.split(" - ")[0]
+        gdf = gdf[gdf["UNLocode"] == selected_name]
 
     # --- Mappa ---
     m1 = create_map()
@@ -205,7 +207,7 @@ with tab2:
     gdf_data = ALL_GDFS[dataset_choice]
 
     if dataset_choice == "No italian ports (v3)":
-        gdf_data["label"] = gdf_data["UNLocode"].astype(str) + " - " + gdf_data["Name"].astype(str)
+        gdf_data["port"] = gdf_data["UNLocode"].astype(str) + " - " + gdf_data["Name"].astype(str)
         country = st.selectbox(
             "Seleziona Paese",
             sorted(gdf_data["Country"].dropna().unique())
@@ -214,10 +216,10 @@ with tab2:
 
         port = st.selectbox(
             "Seleziona Porto",
-            sorted(gdf_data["label"].dropna().unique())
+            sorted(gdf_data["port"].dropna().unique())
         )
         selected_name = port.split(" - ")[0]
-        gdf_data = gdf_data[gdf_data["Name"] == selected_name]
+        gdf_data = gdf_data[gdf_data["UNLocode"] == selected_name]
 
     # ---------------- INPUT ----------------
     col1, col2, col3, col4 = st.columns(4)
