@@ -5,6 +5,8 @@ from streamlit_folium import st_folium
 import geopandas as gpd
 import h3ronpy.pandas.vector as hrpv
 from h3ronpy import grid_disk
+import numpy as np
+from h3ronpy.vector import coordinates_to_cells
 
 # =====================================================
 # CONFIG APP
@@ -17,7 +19,6 @@ st.title("🌍 AIS - Visualizzazione porti e H3")
 # =====================================================
 @st.cache_data
 def load_data():
-
     ita_ports = pd.read_csv(
         "https://raw.githubusercontent.com/istat-methodology/istat-ais-lib/refs/heads/main/data/Porti_ITA_fitted_RES_8_V3.csv",
         sep=";"
@@ -83,18 +84,30 @@ def create_map(center=[42.23, 12.97], zoom=5):
 
 
 def add_gdf_to_map(m, gdf, color):
+    
+    gdf_c = gdf.copy()
+    gdf_c["H3_int_index_8"] = gdf_c["H3_int_index_8"].astype(str)
 
-    for _, row in gdf.iterrows():
-        folium.GeoJson(
-            row.geometry.__geo_interface__,
-            tooltip=row.get("Name", ""),
-            style_function=lambda x, c=color: {
-                "fillColor": c,
-                "color": c,
-                "weight": 0.7,
-                "fillOpacity": 0.4,
-            },
-        ).add_to(m)
+    folium.GeoJson(
+        gdf_c,
+        tooltip=folium.GeoJsonTooltip(
+            fields=["Name", "H3_hex_8", "H3_int_index_8"],
+            aliases=["Nome:", "H3 Hex:", "H3 Int:"],
+            localize=True,
+            labels=True,
+            sticky=False,
+        ),
+        popup=folium.GeoJsonPopup(
+            fields=["Name", "H3_hex_8", "H3_int_index_8"],
+            aliases=["Nome:", "H3 Hex:", "H3 Int:"],
+        ),
+        style_function=lambda feature: {
+            "fillColor": color,
+            "color": color,
+            "weight": 0.7,
+            "fillOpacity": 0.4,
+        },
+    ).add_to(m)
 
     return m
 
@@ -148,7 +161,33 @@ with tab1:
     add_gdf_to_map(m1, gdf, "blue")
 
     folium.LayerControl().add_to(m1)
-    st_folium(m1, width=900, height=600)
+    map_data = st_folium(m1, width=900, height=600)
+
+    if map_data and map_data.get("last_clicked"):
+
+        lat_click = map_data["last_clicked"]["lat"]
+        lon_click = map_data["last_clicked"]["lng"]
+        int_cells = coordinates_to_cells(latarray= [lat_click], lngarray=[lon_click], resarray=8)
+        h3_int = int(int_cells[0].as_py())
+        h3_hex = format(h3_int, "x")
+      
+        geometries = hrpv.cells_to_polygons(int_cells)
+        names = ["New Hexagon"]
+        hexes = [h3_hex]
+        ints = [h3_int]
+        gdf_hex = gpd.GeoDataFrame(
+            {
+                "Name": names,
+                "H3_hex_8": hexes,
+                "H3_int_index_8": ints
+            },
+            geometry=geometries,
+            crs="EPSG:4326"
+        )
+
+        add_gdf_to_map(m1, gdf_hex, "red")
+
+        st.success(f"📍 Coordinate cliccate: Lat: {lat_click}, Lon: {lon_click}, H3 Hex: {h3_hex}, H3 Int: {h3_int}")
 
 
 # =====================================================
@@ -192,25 +231,25 @@ with tab2:
 
     if st.button("Genera poligoni H3"):
 
-        # punto
-        gdf_point = gpd.GeoDataFrame(
-            geometry=gpd.points_from_xy([lon], [lat]),
-            crs="EPSG:4326"
-        )
-
-        df_h3 = hrpv.geodataframe_to_cells(
-            gdf_point,
-            resolution=resolution
-        )
+        int_cells = coordinates_to_cells(latarray= [lat], lngarray=[lon], resarray=8)
+        h3_int = int(int_cells[0].as_py())
 
         h3_ring = grid_disk(
-            [df_h3["cell"].iloc[0]],
+            [h3_int],
             k=k_ring,
             flatten=True
         )
 
         geometries = hrpv.cells_to_polygons(h3_ring)
+        names = ["Ring"] * len(h3_ring)
+        hexes = [format(cell.as_py(), "x") for cell in h3_ring]
+        ints = [int(cell.as_py()) for cell in h3_ring]
         gdf_ring = gpd.GeoDataFrame(
+            {
+                "Name": names,
+                "H3_hex_8": hexes,
+                "H3_int_index_8": ints
+            },
             geometry=geometries,
             crs="EPSG:4326"
         )
