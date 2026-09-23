@@ -19,7 +19,7 @@ st.title("🌍 AIS - Visualizzazione porti e H3")
 @st.cache_data
 def load_data():
     ita_ports = pd.read_csv(
-        "https://raw.githubusercontent.com/istat-methodology/istat-ais-lib/refs/heads/main/data/Porti_ITA_fitted_RES_8_V3.csv",
+        "https://raw.githubusercontent.com/istat-methodology/istat-ais-lib/refs/heads/main/data/Porti_ITA_fitted_RES_8_V4.csv",
         sep=";"
     )
 
