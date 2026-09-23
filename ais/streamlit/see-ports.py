@@ -34,7 +34,7 @@ def load_data():
     )
 
     return {
-        "Italian ports (v3)": ita_ports,
+        "Italian ports (v4)": ita_ports,
         "No italian ports (v3)": no_ita_ports,
         "Offshore platforms (v1)": offshore_platforms,
     }
