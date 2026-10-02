@@ -121,8 +121,8 @@ if "tab2_polygons" not in st.session_state:
 # =====================================================
 # TABS
 # =====================================================
-tab1, tab2 = st.tabs(
-    ["Porti e piattaforme", "Poligoni H3 da coordinate"]
+tab1, tab2, tab3 = st.tabs(
+    ["Porti e piattaforme", "Poligoni H3 da coordinate", "Carica CSV H3"]
 )
 
 # =====================================================
@@ -259,3 +259,44 @@ with tab2:
         key="tab2_map",
         returned_objects=["last_clicked"]
     )
+
+# =====================================================
+# TAB 3
+# =====================================================
+with tab3:
+    st.subheader("Caricamento CSV di esagoni H3")
+    st.caption(
+        "Tracciato atteso (separatore `;`): "
+        "Country;Name;UNLocode;Latitude;Longitude;H3_hex_8;H3_int_index_8;H3_ring;H3_res"
+    )
+
+    uploaded_file = st.file_uploader("Seleziona un file CSV", type="csv", key="tab3_file")
+
+    if uploaded_file is not None:
+        df_upload = pd.read_csv(uploaded_file, sep=";")
+
+        missing = [c for c in ["Name", "H3_hex_8", "H3_int_index_8"] if c not in df_upload.columns]
+        if missing:
+            st.error(f"Colonne mancanti nel file: {', '.join(missing)}")
+        else:
+            gdf_upload = h3_to_gdf(df_upload, "H3_hex_8")
+
+            if gdf_upload.empty:
+                st.warning("Nessuna geometria valida trovata nel file.")
+            else:
+                st.success(f"Caricati {len(gdf_upload)} esagoni H3.")
+
+                centroid = gdf_upload.geometry.union_all().centroid
+                m3 = create_map([centroid.y, centroid.x], 8)
+                add_gdf_to_map(m3, gdf_upload, "green")
+                folium.LayerControl().add_to(m3)
+                st_folium(
+                    m3,
+                    width=900,
+                    height=600,
+                    key="tab3_map",
+                    returned_objects=[]
+                )
+
+                with st.expander("Anteprima dati"):
+                    st.dataframe(df_upload.head(100))
